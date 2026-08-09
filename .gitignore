@@ -1,0 +1,17 @@
+# Environment variables & secrets
+.env
+.env.local
+.env.production
+.env.development
+
+# Build & compiled code
+dist/
+node_modules/
+
+# Local databases & logs
+data/
+logs/
+*.log
+
+# System files
+.DS_Store

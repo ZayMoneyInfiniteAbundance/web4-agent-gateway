@@ -1,0 +1,39 @@
+{
+  "name": "web4-agent-gateway",
+  "version": "1.0.0",
+  "description": "Autonomous Web 4.0 Machine Gateway & JIT API Factory powered by Hono and x402 Payment Middleware",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test:x402": "ts-node scripts/test_x402_flow.ts",
+    "test:milestone": "ts-node scripts/test_e2e_milestone.ts",
+    "test:validation": "ts-node scripts/test_unassisted_agent.ts",
+    "test:reconcile": "ts-node scripts/reconcile_onchain.ts",
+    "test:real-payment": "ts-node scripts/test_real_onchain_payment.ts"
+  },
+  "keywords": [
+    "web4",
+    "x402",
+    "conway",
+    "ai-agent",
+    "monetization",
+    "hono"
+  ],
+  "author": "Conway Web 4.0 Automaton",
+  "license": "MIT",
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.13.5",
+    "hono": "^4.6.20",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.7.3"
+  }
+}
