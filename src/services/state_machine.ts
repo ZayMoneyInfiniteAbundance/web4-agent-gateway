@@ -39,6 +39,7 @@ export interface TransactionRecord {
     payer: string;
     payTo: string;
     network: string;
+    txHash?: string;
     signature: string;
   };
   resultSummary?: {

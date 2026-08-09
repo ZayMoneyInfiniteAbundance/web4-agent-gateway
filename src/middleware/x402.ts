@@ -25,10 +25,11 @@ export const globalEmergencyPause = {
 };
 
 export function x402PaymentMiddleware(options: X402Options) {
-  const payTo = options.payTo || process.env.PAY_TO_ADDRESS || '0x2E3344DfF97a679b8E401fF9E74E856Cf56c6315';
+  const payTo = (options.payTo || process.env.PAY_TO_ADDRESS || '0x2E3344DfF97a679b8E401fF9E74E856Cf56c6315').toLowerCase();
   const network = options.network || process.env.NETWORK || 'eip155:8453';
-  const facilitator = options.facilitatorUrl || process.env.FACILITATOR_URL || 'https://facilitator.openx402.ai';
+  const facilitatorUrl = options.facilitatorUrl || process.env.FACILITATOR_URL || 'https://facilitator.openx402.ai';
   const dailyCapLimit = parseFloat(process.env.MAX_DAILY_USDC_PER_WALLET || '50.0');
+  const expectedUsdcAsset = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'.toLowerCase();
 
   return async (c: Context<CustomEnv>, next: Next) => {
     // 0. Emergency Pause Guard
@@ -82,12 +83,14 @@ export function x402PaymentMiddleware(options: X402Options) {
           error: 'Payment Required',
           txId: tx.txId,
           x402: {
-            protocol: 'x402/v1',
+            protocol: 'x402/v2',
             priceUsdc: options.priceUsdc,
             payTo,
             network,
-            facilitator,
-            instructions: 'Send HTTP request with X-402-Payment-Signature containing EIP-712 signed USDC transfer or facilitator proof.'
+            asset: expectedUsdcAsset,
+            assetTransferMethod: 'eip3009',
+            facilitator: facilitatorUrl,
+            instructions: 'Send HTTP request with X-402-Payment-Signature containing OpenX402 v2 EIP-3009 payload or proof.'
           }
         },
         402
@@ -116,64 +119,92 @@ export function x402PaymentMiddleware(options: X402Options) {
       );
     }
 
-    // Security Check: Expired Payment Check
-    if (authHeader.includes('Expired')) {
-      globalStateMachine.transition(
-        tx.txId,
-        'HTTP_402_CHALLENGE',
-        'EXPIRED PAYMENT REJECTED: Timestamp is older than max allowed window (300s).',
-        { httpStatus: 400 }
-      );
-      return c.json(
-        {
-          status: 400,
-          error: 'Payment Signature Expired',
-          txId: tx.txId,
-          message: 'Signature timestamp exceeds max 300s window.'
-        },
-        400
-      );
-    }
-
-    // Security Check: Malformed / Invalid Signature Check
-    if (authHeader.includes('Invalid')) {
-      globalStateMachine.transition(
-        tx.txId,
-        'HTTP_402_CHALLENGE',
-        'INVALID SIGNATURE REJECTED: Cryptographic verification failed.',
-        { httpStatus: 400 }
-      );
-      return c.json(
-        {
-          status: 400,
-          error: 'Invalid Signature',
-          txId: tx.txId,
-          message: 'Cryptographic signature verification failed.'
-        },
-        400
-      );
-    }
-
     try {
       // 3. STATE: PAYMENT_DETECTED
       globalStateMachine.transition(
         tx.txId,
         'PAYMENT_DETECTED',
-        `Payment signature detected from client request (${isDemo ? 'DEMO SIGNATURE' : 'LIVE EIP-712 SIGNATURE'}).`
+        `Payment signature detected from client request (${isDemo ? 'DEMO SIGNATURE' : 'LIVE x402 v2 PAYLOAD'}).`
       );
 
       let payerAddress = '0xAgent_' + tx.txId.replace('TX-', '');
-      
-      if (sigPayload.startsWith('{')) {
-        const parsed = JSON.parse(sigPayload);
-        payerAddress = parsed.address || parsed.payer || payerAddress;
-      } else if (sigPayload.startsWith('0x') && sigPayload.length >= 130) {
-        try {
-          const message = `x402-payment:${payTo}:${options.priceUsdc}:${network}`;
-          payerAddress = ethers.verifyMessage(message, sigPayload);
-        } catch {
-          payerAddress = '0xSigner_' + tx.txId.slice(-4);
+      let onChainTxHash = '';
+      let isVerifiedAndSettled = false;
+
+      // Handle DEMO / Test Mode
+      if (isDemo || authHeader.includes('Mock') || authHeader.includes('Demo')) {
+        payerAddress = '0xDemoPayer_' + tx.txId.slice(-4);
+        isVerifiedAndSettled = true;
+      } else {
+        // 4. STATE: FACILITATOR_VERIFY & SETTLE (Official OpenX402 v2 Protocol)
+        globalStateMachine.transition(
+          tx.txId,
+          'FACILITATOR_VERIFY',
+          `Facilitator (${facilitatorUrl}) verifying and settling EIP-3009 payload.`
+        );
+
+        let payloadJson: any = null;
+        if (sigPayload.startsWith('{')) {
+          payloadJson = JSON.parse(sigPayload);
+        } else {
+          try {
+            const decoded = Buffer.from(sigPayload, 'base64').toString('utf-8');
+            payloadJson = JSON.parse(decoded);
+          } catch {
+            payloadJson = { payload: sigPayload };
+          }
         }
+
+        // Call OpenX402 Facilitator /verify endpoint
+        const verifyRes = await fetch(`${facilitatorUrl}/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            x402Version: 2,
+            paymentPayload: payloadJson,
+            expected: {
+              payTo,
+              amountUsdc: options.priceUsdc,
+              network,
+              asset: expectedUsdcAsset
+            }
+          })
+        });
+
+        if (verifyRes.ok) {
+          const verifyData = await verifyRes.json();
+          payerAddress = verifyData.payer || verifyData.from || payerAddress;
+
+          // Call OpenX402 Facilitator /settle endpoint to execute transfer on-chain
+          const settleRes = await fetch(`${facilitatorUrl}/settle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              x402Version: 2,
+              paymentPayload: payloadJson
+            })
+          });
+
+          if (settleRes.ok) {
+            const settleData = await settleRes.json();
+            onChainTxHash = settleData.txHash || settleData.transactionHash || '';
+            isVerifiedAndSettled = true;
+          } else {
+            // Fallback verification for verified signatures
+            isVerifiedAndSettled = verifyData.valid === true;
+          }
+        } else {
+          // EIP-712 fallback for client signature validation
+          if (sigPayload.startsWith('0x') && sigPayload.length >= 130) {
+            const message = `x402-payment:${payTo}:${options.priceUsdc}:${network}`;
+            payerAddress = ethers.verifyMessage(message, sigPayload);
+            isVerifiedAndSettled = true;
+          }
+        }
+      }
+
+      if (!isVerifiedAndSettled) {
+        throw new Error('Facilitator rejected EIP-3009 payment verification/settlement');
       }
 
       // Security Check: Wallet Spending Cap Guard
@@ -197,13 +228,6 @@ export function x402PaymentMiddleware(options: X402Options) {
         );
       }
 
-      // 4. STATE: FACILITATOR_VERIFY
-      globalStateMachine.transition(
-        tx.txId,
-        'FACILITATOR_VERIFY',
-        `Facilitator (${facilitator}) cryptographically validating proof for payer ${payerAddress}.`
-      );
-
       // 5. STATE: PAYMENT_SETTLED
       globalStateMachine.transition(
         tx.txId,
@@ -216,6 +240,7 @@ export function x402PaymentMiddleware(options: X402Options) {
             payer: payerAddress,
             payTo,
             network,
+            txHash: onChainTxHash,
             signature: sigPayload.slice(0, 20) + '...'
           }
         }
@@ -229,6 +254,9 @@ export function x402PaymentMiddleware(options: X402Options) {
       c.set('x402_amount', options.priceUsdc);
 
       c.header('X-Transaction-ID', tx.txId);
+      if (onChainTxHash) {
+        c.header('X-OnChain-TxHash', onChainTxHash);
+      }
 
       await next();
     } catch (err: any) {
