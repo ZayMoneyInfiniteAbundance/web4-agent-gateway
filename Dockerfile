@@ -18,10 +18,9 @@ RUN npm ci --omit=dev
 # Copy compiled output and scripts
 COPY --from=builder /app/dist ./dist
 COPY scripts/ ./scripts/
-COPY public/ ./public/
 
-# Create persistent data directory
-RUN mkdir -p /app/data /app/logs
+# Create persistent data directory and public asset directory
+RUN mkdir -p /app/data /app/logs /app/public
 
 # Security: Run as non-root user
 RUN addgroup -S gateway && adduser -S gateway -G gateway
@@ -31,9 +30,5 @@ USER gateway
 # Railway injects PORT automatically
 ENV PORT=3000
 EXPOSE 3000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD wget -qO- http://localhost:3000/v1/health || exit 1
 
 CMD ["node", "dist/index.js"]
