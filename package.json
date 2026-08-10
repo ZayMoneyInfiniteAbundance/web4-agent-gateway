@@ -13,7 +13,8 @@
     "test:reconcile": "ts-node scripts/reconcile_onchain.ts",
     "test:real-payment": "ts-node scripts/test_real_onchain_payment.ts",
     "agent:fugu": "ts-node scripts/fugu_autonomous_agent.ts",
-    "agent:swarm": "ts-node scripts/multi_ai_swarm.ts"
+    "agent:swarm": "ts-node scripts/multi_ai_swarm.ts",
+    "agent:daemon": "ts-node scripts/swarm_daemon.ts"
   },
   "keywords": [
     "web4",
