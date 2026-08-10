@@ -39,7 +39,8 @@ healthRoute.get('/v1/health', async (c) => {
     },
     services: {
       unblocker: { endpoint: '/v1/scrape', priceUsdc: '0.02' },
-      apiFactory: { endpoint: '/v1/factory/create', priceUsdc: '0.50' }
+      apiFactory: { endpoint: '/v1/factory/create', priceUsdc: '0.50' },
+      memecoinAlpha: { endpoint: '/v1/memecoin/alpha', priceUsdc: '0.10' }
     }
   });
 });

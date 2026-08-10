@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 
 import scrapeRoute from './routes/scrape';
 import factoryRoute from './routes/factory';
+import memecoinRoute from './routes/memecoin';
 import healthRoute from './routes/health';
 import termsRoute from './routes/terms';
 import { renderDashboardHtml } from './views/dashboard';
@@ -54,6 +55,7 @@ app.route('/', healthRoute);
 app.route('/', termsRoute);
 app.route('/', scrapeRoute);
 app.route('/', factoryRoute);
+app.route('/', memecoinRoute);
 
 const port = Number(process.env.PORT) || 3000;
 
