@@ -227,6 +227,11 @@ export function renderDashboardHtml(payToAddress: string, network: string, facil
       <span class="mode-badge mode-demo" id="mode-indicator">DEMO MODE</span>
     </div>
 
+    <div style="display: flex; gap: 0.75rem; align-items: center;">
+      <a href="/docs" target="_blank" style="color: var(--accent-cyan); text-decoration: none; font-size: 0.75rem; font-weight: 700; border: 1px solid var(--accent-cyan); padding: 0.25rem 0.6rem; border-radius: 4px;">⚡ API Docs (/docs)</a>
+      <a href="/openapi.json" target="_blank" style="color: var(--text-dim); text-decoration: none; font-size: 0.75rem; border: 1px solid var(--border); padding: 0.25rem 0.6rem; border-radius: 4px;">OpenAPI Spec</a>
+    </div>
+
     <div class="top-health" id="health-grid">
       <div class="health-item"><span class="dot dot-green"></span> Gateway</div>
       <div class="health-item"><span class="dot dot-green"></span> Facilitator</div>

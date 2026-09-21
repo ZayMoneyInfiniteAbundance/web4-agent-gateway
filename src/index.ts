@@ -7,6 +7,7 @@ import factoryRoute from './routes/factory';
 import memecoinRoute from './routes/memecoin';
 import healthRoute from './routes/health';
 import termsRoute from './routes/terms';
+import docsRoute from './routes/docs';
 import { renderDashboardHtml } from './views/dashboard';
 
 dotenv.config();
@@ -36,21 +37,24 @@ app.get('/v1/spec', (c) => {
   return c.json({
     name: 'Web 4.0 Agent Gateway & JIT API Factory',
     version: '1.0.0',
-    description: 'Sovereign machine-to-machine web rendering and JIT API factory powered by x402 on Base USDC.',
+    description: 'Sovereign machine-to-machine web rendering and JIT API factory powered by x402 on Base USDC & RapidAPI.',
     payToAddress: process.env.PAY_TO_ADDRESS || '0x2E3344DfF97a679b8E401fF9E74E856Cf56c6315',
     endpoints: {
       dashboard: 'GET /',
+      docs: 'GET /docs (Interactive Scalar API Reference & Testing)',
+      openapi: 'GET /openapi.json (OpenAPI 3.1 Specification)',
       metrics: 'GET /v1/metrics',
       terms: 'GET /v1/terms',
       health: 'GET /v1/health',
-      wallet: 'GET /v1/wallet',
-      scrape: 'GET /v1/scrape?url=https://example.com ($0.02 USDC via x402)',
-      createJitApi: 'POST /v1/factory/create ($0.50 USDC via x402)'
+      scrape: 'GET /v1/scrape?url=https://example.com ($0.02 USDC via x402 or RapidAPI Key)',
+      createJitApi: 'POST /v1/factory/create ($0.50 USDC via x402)',
+      memecoinAlpha: 'GET /v1/memecoin/alpha ($0.10 USDC via x402)'
     }
   });
 });
 
 // Mount modular routes
+app.route('/', docsRoute);
 app.route('/', healthRoute);
 app.route('/', termsRoute);
 app.route('/', scrapeRoute);
